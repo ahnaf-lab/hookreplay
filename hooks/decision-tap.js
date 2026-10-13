@@ -5,6 +5,7 @@ const path = require('path');
 const { hashInput, appendRecord } = require('../lib/cassette');
 const { loadSettings } = require('../lib/settings');
 const { resolveVerdict } = require('../lib/verdict');
+const { primarySpecifier } = require('../lib/matcher');
 
 /**
  * Default cassette location: a dotfile next to wherever the session is
@@ -40,6 +41,11 @@ function buildRecord(event, settings, now = new Date()) {
     session_id: typeof event.session_id === 'string' ? event.session_id : null,
     hook_event: typeof event.hook_event_name === 'string' ? event.hook_event_name : 'unknown',
     tool_name: toolName,
+    // The specifier string permission rules actually test against (e.g. a
+    // Bash command or a file path), not the whole tool input: this is what
+    // later milestones replay against a changed settings.json without
+    // needing to keep the raw tool input around.
+    specifier: primarySpecifier(toolName, toolInput),
     input_hash: hashInput(toolInput),
     verdict: resolveVerdict(settings, toolName, toolInput),
   };

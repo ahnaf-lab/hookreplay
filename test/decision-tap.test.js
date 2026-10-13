@@ -24,6 +24,7 @@ test('buildRecord captures tool, input hash, and verdict from a hook event', () 
   assert.equal(record.session_id, 'abc123');
   assert.equal(record.hook_event, 'PreToolUse');
   assert.equal(record.verdict, 'allow');
+  assert.equal(record.specifier, 'npm test');
   assert.equal(typeof record.input_hash, 'string');
   assert.equal(record.input_hash.length, 64);
 });

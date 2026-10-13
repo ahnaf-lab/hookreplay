@@ -5,11 +5,10 @@ A plugin for permission- and hook-driven coding agents that records every
 so you can later check whether a change to `settings.json` or your hooks
 would make the same tool call resolve differently.
 
-This is the cassette format and loader milestone: decisions are captured as
-`(tool, input hash, verdict)` triples into a JSONL cassette, and a loader
-parses that file back into an ordered list of records with a stable schema.
-Replaying a cassette against a changed configuration to flag regressions is a
-later milestone.
+This is the replay engine milestone: a loader parses a JSONL cassette into an
+ordered list of records with a stable schema, and the replay engine
+re-evaluates each recorded decision against the permission rules currently on
+disk, flagging any one whose verdict would now resolve differently.
 
 ## Install
 
@@ -31,8 +30,15 @@ Once installed as a plugin, every tool call that goes through the
 - `session_id` — the session the call belonged to
 - `hook_event` — which hook fired (`PreToolUse`)
 - `tool_name` — the tool being called (`Bash`, `Read`, ...)
-- `input_hash` — a SHA-256 hash of the tool input, so the cassette never
-  stores raw command text or file contents
+- `specifier` — the string permission rules actually test against for that
+  tool (a `Bash` command, a `Read`/`Write`/`Edit` file path, a `Glob`/`Grep`
+  pattern, a `WebFetch` url), i.e. the same value a rule like
+  `Bash(npm run build:*)` matches with its wildcard. This is the minimum
+  slice of the tool input the replay engine needs to re-test a decision
+  against new rules; other tool input fields (such as file contents written
+  by `Write`) are never recorded.
+- `input_hash` — a SHA-256 hash of the full tool input, kept alongside
+  `specifier` as an integrity signal
 - `verdict` — `allow`, `deny`, or `ask`, resolved from the current
   `permissions.allow` / `permissions.deny` / `permissions.ask` rules in
   `.claude/settings.json` (project and user)
@@ -50,6 +56,42 @@ node bin/hookreplay.js show
 node bin/hookreplay.js show path/to/cassette.jsonl
 ```
 
+### Replay
+
+Re-evaluate every recorded decision against the permission rules currently on
+disk, and report any whose verdict would now resolve differently:
+
+```sh
+node bin/hookreplay.js diff
+node bin/hookreplay.js diff path/to/cassette.jsonl
+```
+
+Each line shows the tool, the previous verdict, the current verdict, and the
+specifier that was tested, for example:
+
+```
+CHANGED  Bash  ask -> allow  npm run build:prod
+same     Bash  allow -> allow  npm test
+```
+
+`diff` exits with status `1` if any decision changed (and `0` otherwise), so
+it can gate a CI job: a passing run means the current `settings.json` and
+hooks still resolve every recorded decision the same way the session that
+captured the cassette did.
+
+Programmatically, `lib/replay.js` exposes:
+
+- `replayRecord(record, settings)` — re-evaluate one normalized cassette
+  record against a merged `{ allow, deny, ask }` rule set (as returned by
+  `loadSettings`), returning the record plus `previous_verdict`,
+  `current_verdict`, and `changed`.
+- `replayCassette(cassettePath, options)` — load a cassette and replay every
+  record, returning `{ results, errors, summary }`, where `summary` is
+  `{ total, changed, unchanged }`. By default it loads settings from the
+  current directory the same way the decision tap does; pass
+  `{ settings }` directly to replay against an arbitrary rule set instead
+  (mainly useful for tests or "what if" comparisons).
+
 ### Cassette loader
 
 `lib/loader.js` turns a raw JSONL cassette into an ordered list of decision
@@ -58,11 +100,13 @@ records with a stable schema. `loadCassette(path)` returns
 
 - `records` — every successfully parsed line, normalized to always carry
   `sequence`, `timestamp`, `session_id`, `hook_event`, `tool_name`,
-  `input_hash`, and `verdict`, with safe defaults (`null`/`"unknown"`) for
-  any field a line left out. `sequence` is the record's 0-based position
-  among the successfully parsed records, which is what later milestones use
-  as the ordering key — it stays stable even if two records happen to share
-  a `timestamp` at clock resolution.
+  `specifier`, `input_hash`, and `verdict`, with safe defaults
+  (`null`/`"unknown"`/`""`) for any field a line left out. `sequence` is the
+  record's 0-based position among the successfully parsed records, which is
+  the ordering key the replay engine relies on — it stays stable even if two
+  records happen to share a `timestamp` at clock resolution. A cassette
+  recorded before this milestone has no `specifier` field and normalizes to
+  `""`, which only replays correctly against rules with no specifier at all.
 - `errors` — one entry per line that failed to parse or validate
   (`{ line, raw, message }`). A corrupt or hand-edited line is reported, not
   thrown, so the rest of the cassette still loads.

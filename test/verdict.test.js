@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { resolveVerdict } = require('../lib/verdict');
+const { resolveVerdict, resolveVerdictForSpecifier } = require('../lib/verdict');
 
 test('deny rule wins even when an allow rule also matches', () => {
   const settings = { allow: ['Bash(*)'], deny: ['Bash(rm -rf *)'], ask: [] };
@@ -27,4 +27,10 @@ test('no matching rule defaults to ask', () => {
   const settings = { allow: [], deny: [], ask: [] };
   const verdict = resolveVerdict(settings, 'Bash', { command: 'echo hi' });
   assert.equal(verdict, 'ask');
+});
+
+test('resolveVerdictForSpecifier applies the same deny-beats-allow precedence directly to a specifier string', () => {
+  const settings = { allow: ['Bash(*)'], deny: ['Bash(rm -rf *)'], ask: [] };
+  assert.equal(resolveVerdictForSpecifier(settings, 'Bash', 'rm -rf /tmp/scratch'), 'deny');
+  assert.equal(resolveVerdictForSpecifier(settings, 'Bash', 'npm test'), 'allow');
 });

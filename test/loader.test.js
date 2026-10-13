@@ -44,6 +44,7 @@ test('loadCassette fills in a stable schema for records missing fields', () => {
     'input_hash',
     'session_id',
     'sequence',
+    'specifier',
     'tool_name',
     'timestamp',
     'verdict',
@@ -51,6 +52,7 @@ test('loadCassette fills in a stable schema for records missing fields', () => {
   assert.equal(records[0].session_id, null);
   assert.equal(records[0].hook_event, 'unknown');
   assert.equal(records[0].verdict, 'unknown');
+  assert.equal(records[0].specifier, '');
 });
 
 test('loadCassette skips an unparseable line and reports it without dropping valid lines', () => {
