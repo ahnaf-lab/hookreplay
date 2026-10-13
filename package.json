@@ -1,0 +1,23 @@
+{
+  "name": "hookreplay",
+  "version": "0.1.0",
+  "description": "Claude Code plugin that records permission/hook decisions into a cassette and replays them against current settings to flag regressions.",
+  "license": "MIT",
+  "type": "commonjs",
+  "main": "lib/index.js",
+  "bin": {
+    "hookreplay": "bin/hookreplay.js"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "lib",
+    "hooks",
+    "bin",
+    ".claude-plugin"
+  ]
+}
