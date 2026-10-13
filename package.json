@@ -17,6 +17,7 @@
   "files": [
     "lib",
     "hooks",
+    "commands",
     "bin",
     ".claude-plugin"
   ]

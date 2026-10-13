@@ -4,5 +4,6 @@
   "description": "Records permission/hook decisions into a cassette file and replays them against current settings to flag regressions.",
   "author": "Syed Ahnaf Raza",
   "license": "MIT",
+  "commands": "./commands",
   "hooks": "./hooks/hooks.json"
 }

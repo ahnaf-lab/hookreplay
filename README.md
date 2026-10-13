@@ -5,11 +5,10 @@ A plugin for permission- and hook-driven coding agents that records every
 so you can later check whether a change to `settings.json` or your hooks
 would make the same tool call resolve differently.
 
-This is the diff report milestone: a loader parses a JSONL cassette into an
-ordered list of records with a stable schema, a replay engine re-evaluates
-each recorded decision against the permission rules currently on disk, and a
-report module turns that into a deterministic listing of exactly the
-decisions whose verdict changed, old verdict vs new.
+This is the plugin wiring milestone: the recorder, loader, replay engine,
+and diff report from earlier milestones are now exposed as an installable
+plugin, with a `/hookreplay` command that runs the full report from inside
+a session.
 
 ## Install
 
@@ -17,12 +16,34 @@ decisions whose verdict changed, old verdict vs new.
 npm install
 ```
 
-To use this as a plugin, point your plugin loader at this directory (it
-contains `.claude-plugin/plugin.json` and registers a `PreToolUse` hook in
-`hooks/hooks.json`). The hook runs with plain `node` and has no runtime
-dependencies.
+To use this as a plugin, point your plugin loader at this directory. It
+contains `.claude-plugin/plugin.json`, which registers:
+
+- a `PreToolUse` hook (`hooks/hooks.json`) that records every decision, and
+- a `/hookreplay` command (`commands/hookreplay.md`) that replays the
+  cassette and reports the result.
+
+Both run with plain `node` and have no runtime dependencies.
 
 ## Usage
+
+### `/hookreplay` command
+
+Once installed as a plugin, run the full diff report from inside a session:
+
+```
+/hookreplay
+/hookreplay path/to/cassette.jsonl
+/hookreplay --json
+```
+
+The command shells out to `bin/hookreplay.js report`, using
+`${CLAUDE_PLUGIN_ROOT}` so it works regardless of where the plugin is
+installed, and relays the same text (or `--json`) output documented under
+"Diff report" below, so the result inside a session is identical to running
+the CLI directly.
+
+### Decision tap
 
 Once installed as a plugin, every tool call that goes through the
 `PreToolUse` hook is recorded automatically. Each record contains:
