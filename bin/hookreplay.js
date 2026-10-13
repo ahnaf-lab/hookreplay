@@ -2,7 +2,7 @@
 'use strict';
 
 const path = require('path');
-const { readRecords } = require('../lib/cassette');
+const { loadCassette } = require('../lib/loader');
 
 function cassettePathFor(cwd) {
   return process.env.HOOKREPLAY_CASSETTE || path.join(cwd, '.hookreplay', 'cassette.jsonl');
@@ -32,7 +32,11 @@ function main(argv) {
   }
 
   const cassettePath = explicitPath || cassettePathFor(process.cwd());
-  const records = readRecords(cassettePath);
+  const { records, errors } = loadCassette(cassettePath);
+
+  for (const error of errors) {
+    process.stderr.write(`hookreplay: skipping line ${error.line}: ${error.message}\n`);
+  }
 
   if (records.length === 0) {
     process.stdout.write(`No decisions recorded yet at ${cassettePath}\n`);

@@ -5,9 +5,11 @@ A plugin for permission- and hook-driven coding agents that records every
 so you can later check whether a change to `settings.json` or your hooks
 would make the same tool call resolve differently.
 
-This is the decision-tap milestone: it captures `(tool, input hash, verdict)`
-triples into a JSONL cassette. Replaying a cassette against a changed
-configuration to flag regressions is a later milestone.
+This is the cassette format and loader milestone: decisions are captured as
+`(tool, input hash, verdict)` triples into a JSONL cassette, and a loader
+parses that file back into an ordered list of records with a stable schema.
+Replaying a cassette against a changed configuration to flag regressions is a
+later milestone.
 
 ## Install
 
@@ -47,6 +49,27 @@ Inspect a cassette from the command line:
 node bin/hookreplay.js show
 node bin/hookreplay.js show path/to/cassette.jsonl
 ```
+
+### Cassette loader
+
+`lib/loader.js` turns a raw JSONL cassette into an ordered list of decision
+records with a stable schema. `loadCassette(path)` returns
+`{ records, errors }`:
+
+- `records` — every successfully parsed line, normalized to always carry
+  `sequence`, `timestamp`, `session_id`, `hook_event`, `tool_name`,
+  `input_hash`, and `verdict`, with safe defaults (`null`/`"unknown"`) for
+  any field a line left out. `sequence` is the record's 0-based position
+  among the successfully parsed records, which is what later milestones use
+  as the ordering key — it stays stable even if two records happen to share
+  a `timestamp` at clock resolution.
+- `errors` — one entry per line that failed to parse or validate
+  (`{ line, raw, message }`). A corrupt or hand-edited line is reported, not
+  thrown, so the rest of the cassette still loads.
+
+A missing cassette file loads as an empty cassette (`{ records: [], errors:
+[] }`) rather than an error, since a session that hasn't recorded anything
+yet is a normal starting state.
 
 Run the test suite:
 
