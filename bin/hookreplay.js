@@ -4,6 +4,7 @@
 const path = require('path');
 const { loadCassette } = require('../lib/loader');
 const { replayCassette } = require('../lib/replay');
+const { buildDiffReport, formatDiffReportText, formatDiffReportJson } = require('../lib/report');
 
 function cassettePathFor(cwd) {
   return process.env.HOOKREPLAY_CASSETTE || path.join(cwd, '.hookreplay', 'cassette.jsonl');
@@ -14,11 +15,15 @@ function printUsage() {
     [
       'Usage: hookreplay show [cassette-path]',
       '       hookreplay diff [cassette-path]',
+      '       hookreplay report [cassette-path] [--json]',
       '',
-      '  show   Print every recorded decision in the cassette, one per line.',
-      '  diff   Re-evaluate every recorded decision against the permission rules',
-      '         currently on disk and report any whose verdict would now resolve',
-      '         differently. Exits non-zero if any decision changed.',
+      '  show    Print every recorded decision in the cassette, one per line.',
+      '  diff    Re-evaluate every recorded decision against the permission rules',
+      '          currently on disk and print every one of them (changed or not).',
+      '          Exits non-zero if any decision changed.',
+      '  report  Re-evaluate every recorded decision and print only the ones',
+      '          whose verdict changed, old vs new. Pass --json for machine-',
+      '          readable output. Exits non-zero if any decision changed.',
       '',
       'With no path, reads .hookreplay/cassette.jsonl under the current directory',
       '(or $HOOKREPLAY_CASSETTE if set).',
@@ -72,21 +77,36 @@ function runDiff(cassettePath) {
   process.exitCode = summary.changed > 0 ? 1 : 0;
 }
 
-function main(argv) {
-  const [command, explicitPath] = argv;
+function runReport(cassettePath, { json }) {
+  const { results, errors, summary } = replayCassette(cassettePath, { cwd: process.cwd() });
+  reportErrors(errors);
 
-  if (command !== 'show' && command !== 'diff') {
+  const report = buildDiffReport({ results, summary });
+  const output = json ? formatDiffReportJson(report) : `${formatDiffReportText(report)}\n`;
+  process.stdout.write(output);
+
+  process.exitCode = summary.changed > 0 ? 1 : 0;
+}
+
+function main(argv) {
+  const [command, ...rest] = argv;
+
+  if (command !== 'show' && command !== 'diff' && command !== 'report') {
     printUsage();
     process.exitCode = command ? 1 : 0;
     return;
   }
 
+  const json = rest.includes('--json');
+  const explicitPath = rest.find((arg) => arg !== '--json');
   const cassettePath = explicitPath || cassettePathFor(process.cwd());
 
   if (command === 'show') {
     runShow(cassettePath);
-  } else {
+  } else if (command === 'diff') {
     runDiff(cassettePath);
+  } else {
+    runReport(cassettePath, { json });
   }
 }
 

@@ -5,10 +5,11 @@ A plugin for permission- and hook-driven coding agents that records every
 so you can later check whether a change to `settings.json` or your hooks
 would make the same tool call resolve differently.
 
-This is the replay engine milestone: a loader parses a JSONL cassette into an
-ordered list of records with a stable schema, and the replay engine
-re-evaluates each recorded decision against the permission rules currently on
-disk, flagging any one whose verdict would now resolve differently.
+This is the diff report milestone: a loader parses a JSONL cassette into an
+ordered list of records with a stable schema, a replay engine re-evaluates
+each recorded decision against the permission rules currently on disk, and a
+report module turns that into a deterministic listing of exactly the
+decisions whose verdict changed, old verdict vs new.
 
 ## Install
 
@@ -78,6 +79,43 @@ same     Bash  allow -> allow  npm test
 it can gate a CI job: a passing run means the current `settings.json` and
 hooks still resolve every recorded decision the same way the session that
 captured the cassette did.
+
+### Diff report
+
+`diff` prints every recorded decision, changed or not. To see only the
+regressions, old verdict vs new, use `report`:
+
+```sh
+node bin/hookreplay.js report
+node bin/hookreplay.js report path/to/cassette.jsonl
+node bin/hookreplay.js report --json
+```
+
+Text output lists one line per changed decision, in cassette file order, and
+a trailing summary line:
+
+```
+Bash  ask -> deny  rm -rf /tmp/scratch
+
+1 of 3 decision(s) changed.
+```
+
+If nothing changed, it prints `No decisions changed.` instead of an empty
+line, so a clean run is never confused with a run that produced no output at
+all. `--json` prints the same data as a single JSON object
+(`{ summary, changes }`) for scripting; both forms are deterministic, so the
+same cassette and the same settings always produce byte-identical output.
+`report` exits with status `1` if any decision changed, same as `diff`.
+
+Programmatically, `lib/report.js` exposes:
+
+- `buildDiffReport({ results, summary })` — takes the output of
+  `replayCassette` and returns `{ summary, changes }`, where `changes` is
+  only the records whose verdict changed, sorted by `sequence`, each
+  trimmed to `{ sequence, timestamp, tool_name, specifier,
+  previous_verdict, current_verdict }`.
+- `formatDiffReportText(report)` / `formatDiffReportJson(report)` — render
+  that report as the text or JSON shown above.
 
 Programmatically, `lib/replay.js` exposes:
 
